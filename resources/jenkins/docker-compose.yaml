@@ -1,0 +1,46 @@
+# docker-compose.yaml
+version: '3.8'
+
+networks:
+ jenkins_net:
+  driver: bridge
+
+volumes:
+ agent_workspace:
+ jenkins_home:
+
+x-common-config: &common-config
+    networks:
+     - jenkins_net
+    restart: unless-stopped
+
+services:
+  jenkins:
+    image: jenkins/jenkins:lts
+    container_name: jenkins
+    privileged: true
+    user: root
+    <<: *common-config
+    environment:
+      - JENKINS_OPTS=--httpPort=80
+      - JAVA_OPTS=-Dhudson.model.DownloadService.noSignatureCheck=true
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+     - 80:80
+
+  agent:
+    image: jenkins/ssh-agent:jdk11
+    privileged: true
+    user: root
+    container_name: agent
+    <<: *common-config
+    expose:
+      - 22
+    environment:
+      - JENKINS_AGENT_SSH_PUBKEY=-JENKINS_AGENT_SSH_PUBKEY-
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - agent_workspace:/home/jenkins/agent/workspace/

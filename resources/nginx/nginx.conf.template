@@ -1,0 +1,39 @@
+events {
+	worker_connections  4096;  ## Default: 1024
+}
+
+http{
+
+	proxy_read_timeout 3600;
+	proxy_connect_timeout 3600;
+	proxy_send_timeout 3600;
+
+	ssl_certificate /ssl/nginx.crt;
+	ssl_certificate_key /ssl/nginx.key;
+   
+	server {
+		listen 443 ssl;
+		server_name dot.local
+	
+		add_header Content-Security-Policy "default-src https: data: wss: 'unsafe-inline' 'unsafe-eval'"
+		add_header X-Xss-Protection "1; mode=block"
+		add_header X-Content-Type-Options "nosniff"
+		add_header Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+		add_header X-Frame-Options "SAMEORIGIN"
+		add_header Cache-control "no-store, no-cache"
+		add_header Pragma "no-cache"
+
+		location  /jenkins/ {
+			proxy_pass http://${jenkins_addr}/ ;
+                }
+
+		location  /gitea/ {
+			proxy_pass http://${gitea_addr}/ ;
+                }
+
+		location  /artifactory/ {
+			proxy_pass http://${artifactory_addr}/ ;
+                }
+
+	}
+}

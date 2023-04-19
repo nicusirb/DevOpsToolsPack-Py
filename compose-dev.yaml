@@ -1,0 +1,17 @@
+---
+# docker-compose dev stack
+version: "3.9"
+
+
+services:
+ ###################
+ ## python:3.11.2 ##
+ ###################
+ python-dev:
+  image: python:3.11.2-alpine3.17
+  container_name: python-dev
+  volumes:
+   - /etc/localtime:/etc/localtime:ro
+   - /mnt/e/Facultate-n-Stuff/Licenta/DevOpsToolsPack-Py/:/app
+  ports:
+   - 5555:5555
