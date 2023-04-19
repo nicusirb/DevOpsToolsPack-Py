@@ -1,2 +1,5 @@
 shadow
 __pycache__
+.vscode
+.aws
+.ash_history

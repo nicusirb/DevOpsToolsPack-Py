@@ -7,5 +7,7 @@ services:
     restart: unless-stopped
     network_mode: host
     volumes:
-      - $(pwd)/nginx/nginx.conf:/etc/nginx/nginx.conf
-      - $(pwd)/nginx/certs/:/ssl/
+      - ~/resources/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ~/resources/nginx/certs/:/ssl/
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro

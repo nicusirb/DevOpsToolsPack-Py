@@ -1,7 +1,13 @@
 FROM python:3.11.2-alpine3.17
 
-RUN pip install --upgrade pip && \
-    python3 -m pip install boto3
+LABEL "maintainer" "Nicusor Sirb"
 
-USER 1000
-RUN mkdir -p ~/pem_keys/
+RUN adduser -h /app -D -u 1000 app
+
+USER app
+
+COPY --chown=app:app ./ /app/
+
+RUN pip install --upgrade pip && \
+    pip install -r requirments.txt && \
+    mkdir -p /app/shadow/

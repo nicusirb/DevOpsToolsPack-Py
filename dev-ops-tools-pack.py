@@ -1,7 +1,14 @@
-import logging
-from datetime import date, datetime
 import botocore
 import boto3
+import json
+import os
+import logging
+from datetime import date, datetime
+import paramiko
+import time
+
+from utils.functions_vpc import *
+from utils.functions_ec2 import *
 
 # logger config
 logger = logging.getLogger()
@@ -10,207 +17,28 @@ logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] %(
 def json_datetime_serializer(obj):
     """
     Helper method to serialize datetime fields
+    json.dumps(MY_AWS_BOTO3_OBJ, indent=4, default=json_datetime_serializer)
     """
     if isinstance(obj, (datetime, date)):
         return obj.isoformat()
     raise TypeError("Type %s not serializable" % type(obj))
 
-def create_vpc(name, cidr_block):
-    """
-    CidrBlock='10.0.0.0/26'
-    """
-    client = boto3.client('ec2')
-    try:
-        vpc = client.create_vpc(
-            CidrBlock=cidr_block,
-            AmazonProvidedIpv6CidrBlock=False,
-            InstanceTenancy='default',
-            TagSpecifications=[
-                {
-                    'ResourceType': 'vpc',
-                    'Tags': [
-                        {
-                            'Key': 'Project',
-                            'Value': 'DevOps Tools Pack'
-                        },
-                        {
-                            'Key': 'Name',
-                            'Value': name
-                        },
-                    ]
-                },
-            ]
-        )
-        
-        
-        # wait for the VPC to become available
-        waiter = client.get_waiter('vpc_available')
-        waiter.wait(VpcIds=[vpc['Vpc']['VpcId']])
 
-        # enable DNS support in the VPC
-        client.modify_vpc_attribute(VpcId=vpc['Vpc']['VpcId'], EnableDnsSupport={'Value': True})
-        client.modify_vpc_attribute(VpcId=vpc['Vpc']['VpcId'], EnableDnsHostnames={'Value': True})
-        return vpc
-    except botocore.exceptions.ClientError as error: 
-        if error.response['Error']['Code'] == 'VpcLimitExceeded':
-            logger.exception(f"The maximum number of VPCs has been reached.")
-            raise
-        else:
-            logger.exception("Unexpected error: ", error)
-            raise
-
-def create_subnet(name, vpc_id, availability_zone, cidr_block):
+def main(project='dev-ops-tools-pack'):
     """
-    AvailabilityZone='eu-central-1a',
-    AvailabilityZoneId='euc1-az2',
-    CidrBlock='10.0.0.0/28',
+    Start boto3 session, get config from ~/.aws/config , ~/.aws/credentials:
     """
-    client = boto3.client('ec2')
-    response = client.create_subnet(
-        VpcId=vpc_id,
-        TagSpecifications=[
-            {
-                'ResourceType': 'subnet',
-                'Tags': [
-                    {
-                        'Key': 'Project',
-                        'Value': 'DevOps Tools Pack'
-                    },
-                    {
-                        'Key': 'Name',
-                        'Value': name
-                    },
-                ]
-            },
-        ],
-        AvailabilityZone=availability_zone,
-        CidrBlock=cidr_block,
-        Ipv6Native=False
-    )
-    return response
- 
-def create_internet_gateway(name):
-    client = boto3.client('ec2')
-    try:
-        response = client.create_internet_gateway(
-            TagSpecifications=[
-                {
-                    'ResourceType': 'internet-gateway',
-                    'Tags': [
-                        {
-                            'Key': 'Project',
-                            'Value': 'DevOps Tools Pack'
-                        },
-                        {
-                            'Key': 'Name',
-                            'Value': name
-                        },
-                    ]
-                },
-            ],
-        )
-        return response
-    except botocore.exceptions.ClientError as error: 
-        if error.response['Error']['Code'] == 'InternetGatewayLimitExceeded':
-            logger.exception(f"[Error] The maximum number of internet gateways has been reached.")
-            raise
-        else:
-            logger.exception("Unexpected error: ", error)
-            raise
-  
-def create_route_table(name, vpc_id):
-    client = boto3.client('ec2')
-    response = client.create_route_table(
-        VpcId=vpc_id,
-        TagSpecifications=[
-            {
-                'ResourceType': 'route-table',
-                'Tags': [
-                    {
-                        'Key': 'Project',
-                        'Value': 'DevOps Tools Pack'
-                    },
-                    {
-                        'Key': 'Name',
-                        'Value': name
-                    },
-                ]
-            },
-        ]
-    )
-    return response
-
-def create_route(route_table, destination, target, target_type):
-    client = boto3.client('ec2')
-    response = None
-    match target_type:
-        case "VPCEndpoint":
-                response = client.create_route(
-                    RouteTableId=route_table,
-                    DestinationPrefixListId=destination,
-                    VpcEndpointId=target
-                )
-                logger.info(f"Create route - Destination: '{destination}' - Target: VPCEndpoint '{target}'")
-        case "InternetGateway":
-                response = client.create_route(
-                    RouteTableId=route_table,
-                    DestinationCidrBlock=destination,
-                    GatewayId=target
-                )
-                logger.info(f"Create route - Destination: '{destination}' - Target: InternetGateway '{target}'")
-        case "NatGateway":
-                response = client.create_route(
-                    RouteTableId=route_table,
-                    DestinationCidrBlock=destination,
-                    NatGatewayId=target
-                )
-                logger.info(f"Create route - Destination: '{destination}' - Target: NatGateway '{target}'")
-    return response
-
-def create_vpc_endpoint(name, vpc_id, service_name, route_tables=[], subnets=[], security_groups=[]):
-    """
-    VpcId='vpc-0111ac0194d93a36b',
-    ServiceName='com.amazonaws.eu-central-1.s3',
-    !! Parameters: route_tables, subnets, security_groups - are type list
-    """
-    client = boto3.client('ec2')
-    response = client.create_vpc_endpoint(
-        VpcEndpointType='Gateway',
-        VpcId=vpc_id,
-        ServiceName=service_name,
-        RouteTableIds=route_tables,
-        SubnetIds=subnets,
-        SecurityGroupIds=security_groups,
-        TagSpecifications=[
-            {
-                'ResourceType': 'vpc-endpoint',
-                'Tags': [
-                    {
-                        'Key': 'Project',
-                        'Value': 'DevOps Tools Pack'
-                    },
-                    {
-                        'Key': 'Name',
-                        'Value': name
-                    },
-                ]
-            },
-        ]
-    )
-    return response
-
-
-def get_new_vpc(project = "devops-tools-pack"):
     # Init connections
-    logger.info("Initiate AWS connections from VPC creation.")
+    tic = time.perf_counter()
+    logger.info("Initiate AWS connections from EC2 installation.")
     session = boto3.Session()
     client = boto3.client('ec2')
-    ec2 = boto3.resource('ec2')
-    
+    ec2 = boto3.resource('ec2', region_name=session.region_name)
+
     # Create VPC
     vpc = create_vpc(name = project, cidr_block = "10.0.0.0/26")
     logger.info(f"VPC created. Associated ID '{vpc['Vpc']['VpcId']}'")
-    vpce = create_vpc_endpoint(name = "devops-tools-pack-vpce-s3", vpc_id = vpc['Vpc']['VpcId'] ,service_name = "com.amazonaws." + session.region_name + ".s3")
+    vpce = create_vpc_endpoint(name = project+"-s3", vpc_id = vpc['Vpc']['VpcId'] ,service_name = "com.amazonaws." + session.region_name + ".s3")
     logger.info(f"VPC Endpoint created. Associated ID '{vpce['VpcEndpoint']['VpcEndpointId']}'")
     
     # Create Internet Gateway
@@ -261,6 +89,9 @@ def get_new_vpc(project = "devops-tools-pack"):
     waiter = client.get_waiter('nat_gateway_available')
     waiter.wait(NatGatewayIds=[public_subnet1_ng['NatGateway']['NatGatewayId'],public_subnet2_ng['NatGateway']['NatGatewayId']])
 
+    toc = time.perf_counter()
+    print(f"Time took -> {toc - tic:0.4f} seconds")
+
     # Create Public Route Table
     rtb_public = create_route_table(name = project + "-rtb-public", vpc_id = vpc['Vpc']['VpcId'])
     logger.info(f"Public Route Table created. Associated ID '{rtb_public['RouteTable']['RouteTableId']}'")
@@ -292,8 +123,120 @@ def get_new_vpc(project = "devops-tools-pack"):
     client.modify_vpc_endpoint(VpcEndpointId=vpce['VpcEndpoint']['VpcEndpointId'], 
                                AddRouteTableIds=[rtb_private1['RouteTable']['RouteTableId'], rtb_private2['RouteTable']['RouteTableId']])
     logger.info(f"Added Private Route Tables to VPC Endpoint.")
+    toc = time.perf_counter()
+    print(f"Time took -> {toc - tic:0.4f} seconds")
+    ##
+    ## DONE VPC -> ID: vpc['Vpc']['VpcId']
+    ##
 
-    return vpc['Vpc']['VpcId']
+
+    ## 
+    ## Start EC2
+    ##
+
+    ## Reduce variables...
+    vpc_id = vpc['Vpc']['VpcId']
+    private_subnet1_id = private_subnet1['Subnet']['SubnetId']
+    private_subnet2_id = private_subnet2['Subnet']['SubnetId']
+    public_subnet1_id = public_subnet1['Subnet']['SubnetId']
+    public_subnet2_id = public_subnet2['Subnet']['SubnetId']
+
+    
+    create_security_group(group_name=project+"-sgr", subnet_id=private_subnet1_id, ip_permissions="0.0.0.0/0:22,0.0.0.0/0:80,0.0.0.0/0:443")
+    
+    # Set EC2 properties
+    image_id, instance_type, key_pair_name_, instance_size = get_ec2_custom_template("free-ec2-instance")
+    # print(f"Image ID: {image_id}\nInstance type: {instance_type}\nKey pair name: {key_pair_name}")
+    key_pair_name = key_pair_name_ + "-" + str(time.perf_counter()).split('.')[1]
+    create_ec2_key_pair(key_name=key_pair_name)
+
+    private_subnet1_sgr = create_security_group(group_name = project+"-sgr", 
+                                                ip_permissions = "0.0.0.0/0:22,0.0.0.0/0:80,0.0.0.0/0:443", 
+                                                subnet_id  = private_subnet1_id )
+    # Create EC2 instances
+    ec2_jenkins = create_ec2_instance(session.region_name, image_id, instance_type, key_pair_name, instance_size, private_subnet1_id, private_subnet1_sgr, instance_name="dot_jenkins")
+    # ec2_gitea = create_ec2_instance(session.region_name, image_id, instance_type, key_pair_name, instance_size, private_subnet1_id,instance_name="dot_gitea")
+    # ec2_artifactory = create_ec2_instance(session.region_name, image_id, instance_type, key_pair_name, instance_size, private_subnet1_id, instance_name="dot_artifactory")
+
+    ec2_nginx = create_ec2_instance(session.region_name, image_id, instance_type, key_pair_name, instance_size, public_subnet1_id, private_subnet1_sgr, instance_name="dot_nginx")
+
+    logger.info("Jenkins EC2 -|> ")
+    logger.info(ec2_jenkins)
+
+    logger.info(f"Listing EC2 instances in vpc '{vpc_id}':")
+    for instance in client.describe_instances(Filters=[{'Name': 'vpc-id', 'Values':[vpc_id]}])['Reservations']:
+        for tag in instance['Instances'][0]['Tags']:
+                if tag['Key'] == 'Name':
+                        logger.info(f"  - Instance Name: {tag['Value']}, ID: {instance['Instances'][0]['InstanceId']}, State: {instance['Instances'][0]['State']['Name']}, Type: {instance['Instances'][0]['InstanceType']}")
+
+    toc = time.perf_counter()
+    print(f"Time took -> {toc - tic:0.4f} seconds")
+
+    ## Connect SSH to a temporary Elastic IP Allocated to EC2 NGinx 
+    ec2_ssh_key = paramiko.RSAKey.from_private_key_file(os.path.expanduser('~') + "/shadow/" +key_pair_name + ".pem")
+    ssh_client = paramiko.SSHClient()
+    ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+    try:
+        temp_elastic_ip = client.allocate_address(Domain='vpc', TagSpecifications=[{'ResourceType': 'elastic-ip','Tags': [{'Key': 'Name','Value': project + "-temp-eip" }]}])
+        client.associate_address(AllocationId=temp_elastic_ip['AllocationId'], InstanceId=ec2_nginx.id)
+    except botocore.exceptions.ClientError as e:
+        logger.error(e)
+
+    try:
+        # Connect ssh to EC2 instance using temporary elastic IP
+        ssh_client.connect(hostname=temp_elastic_ip['PublicIp'], username="ubuntu", pkey=ec2_ssh_key)
+
+        # Copy Install Scripts
+        sftp = ssh_client.open_sftp()
+
+        # Create subdir
+        sftp.mkdir("./resources")
+        for root, dirs, files in os.walk("./resources", topdown=True):
+            for name in dirs:
+                sftp.mkdir(os.path.join(root, name))
+            for name in files:
+                sftp.put(os.path.join(root, name),os.path.join(root, name))
+        
+
+        logger.info("Copy ssh-key to EC2 instance.")
+        ## Copy ssh-key for further ssh-ing :)
+        sftp.mkdir("./shadow")
+        sftp.put("./shadow/" +key_pair_name + ".pem", "./shadow/" +key_pair_name + ".pem")
+        sftp.close()
+        ssh_client.exec_command("chmod 400 ./shadow/" +key_pair_name + ".pem")
+
+        logger.info("Copy resources to all EC2 instances...")
+        ## Copy resources to other EC2 instances
+        stdin, stdout, stderr = ssh_client.exec_command("scp -r -i ./shadow/" +key_pair_name + ".pem ./resources/ ubuntu@" + ec2_jenkins.private_ip + ":~")
+        # stdin, stdout, stderr = ssh_client.exec_command("scp -r -i ./shadow/" +key_pair_name + ".pem ./resources/ ubuntu@" + ec2_gitea.private_ip + ":~")
+        # stdin, stdout, stderr = ssh_client.exec_command("scp -r -i ./shadow/" +key_pair_name + ".pem ./resources/ ubuntu@" + ec2_artifactory.private_ip + ":~")
+
+        logger.info("Installing docker...")
+        stdin, stdout, stderr = ssh_client.exec_command("sudo /bin/bash ./resources/ubuntu/docker_install.sh")
+        stdin, stdout, stderr = ssh_client.exec_command("ssh -i ./shadow/" +key_pair_name + ".pem ubuntu@"+ ec2_jenkins.private_ip +" sudo /bin/bash ./resources/ubuntu/docker_install.sh")
+        # stdin, stdout, stderr = ssh_client.exec_command("ssh -i ./shadow/" +key_pair_name + ".pem ubuntu@"+ ec2_gitea.private_ip +" sudo /bin/bash ./resources/ubuntu/docker_install.sh")
+        # stdin, stdout, stderr = ssh_client.exec_command("ssh -i ./shadow/" +key_pair_name + ".pem ubuntu@"+ ec2_artifactory.private_ip +" sudo /bin/bash ./resources/ubuntu/docker_install.sh")
+
+
+        logger.info("Installing NGinx")
+        stdin, stdout, stderr = ssh_client.exec_command("sudo /bin/bash ./resources/nginx/install.sh")
+        logger.info("Installing Jenkins")
+        stdin, stdout, stderr = ssh_client.exec_command("ssh -i ./shadow/" +key_pair_name + ".pem ubuntu@"+ ec2_jenkins.private_ip +" sudo /bin/bash ./resources/jenkins/install.sh")
+        logger.info("Installing Gitea")
+        # stdin, stdout, stderr = ssh_client.exec_command("ssh -i ./shadow/" +key_pair_name + ".pem ubuntu@"+ ec2_gitea.private_ip +" docker-compose -f ./resources/gitea/docker-compose.yaml up -d")
+        logger.info("Installing Artifactory")
+        # stdin, stdout, stderr = ssh_client.exec_command("ssh -i ./shadow/" +key_pair_name + ".pem ubuntu@"+ ec2_artifactory.private_ip +"docker-compose -f ./resources/artifactory/docker-compose.yaml up -d")
+
+        # close the client connection once the job is done
+        # Also needed to allow user to run 'docker' commands
+        ssh_client.close()
+
+        toc = time.perf_counter()
+        print(f"Time took -> {toc - tic:0.4f} seconds")
+
+    except Exception as e:
+        logger.error(e)
 
 if __name__ == '__main__':
-    get_new_vpc()
+    main()

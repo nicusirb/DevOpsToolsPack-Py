@@ -1,0 +1,7 @@
+shadow
+__pycache__
+.vscode
+.gitignore
+.aws
+.ash_history
+docker-compose.yaml
