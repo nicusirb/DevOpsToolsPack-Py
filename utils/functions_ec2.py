@@ -4,7 +4,8 @@ import json
 import os
 import logging
 from datetime import date, datetime
-import paramiko
+import time
+import socket
 
 # logger config
 logger = logging.getLogger()
@@ -99,9 +100,9 @@ def create_ec2_instance(region_name, image_id, instance_type, key_pair_name, ins
                         )[0]
     
     if instance_name != None:
-        logger.info(f"EC2 instance '{instance_name}' '{instance.id}' created in region '{region_name}' with type '{instance_type}' and key '{key_pair_name}'.")
+        logger.info(f"EC2 instance '{instance_name}' - Region '{region_name}' - sshkey '{key_pair_name}'.")
     else:
-        logger.info(f"EC2 instance '{instance.id}' created in region '{region_name}' with type '{instance_type}' and key '{key_pair_name}'.")
+        logger.info(f"EC2 instance - Region '{region_name}' - sshkey '{key_pair_name}'.")
     logger.info("Waiting for instance to start...")
     instance.wait_until_running()
     instance.reload() # Reload to get public IP
@@ -123,7 +124,7 @@ def create_ec2_key_pair(key_name):
         logger.warning(f"Key <{json_data['KeyPairs'][0]['KeyName']}> exists, created at: <{json_data['KeyPairs'][0]['CreateTime']}>")
     except botocore.exceptions.ClientError as error: 
         if error.response['Error']['Code'] == 'InvalidKeyPair.NotFound':
-            logger.info("Key does not exists. Creating...")
+            logger.info("Creating ssh-key...")
             client = boto3.client('ec2')
             pem_key = client.create_key_pair(KeyName=key_name)
             with open("./shadow/"+key_name+".pem", "w") as file:
@@ -157,6 +158,26 @@ def get_ec2_custom_template(x):
         "medium-ec2-instance": ("ami-0ec7f9846da6b0f61", "t2.medium", "central-dev-key", 50),
         "large-ec2-instance": ("ami-0ec7f9846da6b0f61", "t2.large", "central-dev-key", 80) 
     }.get(x,"Template name not found!") 
+
+def wait_for_port(port: int, host: str = 'localhost', timeout: float = 5.0):
+    """Wait until a port starts accepting TCP connections.
+    Args:
+        port: Port number.
+        host: Host address on which the port should exist.
+        timeout: In seconds. How long to wait before raising errors.
+    Raises:
+        TimeoutError: The port isn't accepting connection after time specified in `timeout`.
+    """
+    start_time = time.perf_counter()
+    while True:
+        try:
+            with socket.create_connection((host, port), timeout=timeout):
+                break
+        except OSError as ex:
+            time.sleep(0.01)
+            if time.perf_counter() - start_time >= timeout:
+                raise TimeoutError('Waited too long for the port {} on host {} to start accepting '
+                                   'connections.'.format(port, host)) from ex
 
 def main():
     logger.error("Please refer to main app, EC2 main function isn't callable.")

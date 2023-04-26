@@ -1,9 +1,9 @@
-version: "3"
+### stack: gitea
+version: "3.8"
 
 networks:
   gitea:
     external: false
-
 
 volumes:
  gitea_data:
@@ -15,6 +15,8 @@ services:
     environment:
       - USER_UID=1000
       - USER_GID=1000
+      - GITEA__security__INSTALL_LOCK=true
+      - GITEA__service__DISABLE_REGISTRATION=true
     restart: always
     networks:
       - gitea
@@ -23,5 +25,5 @@ services:
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
     ports:
-      - "80:3000"
+      - "3000:3000"
       - "2221:22"

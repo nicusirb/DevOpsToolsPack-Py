@@ -16,10 +16,8 @@ def json_datetime_serializer(obj):
         return obj.isoformat()
     raise TypeError("Type %s not serializable" % type(obj))
 
-def main():
-    
+def main():   
     # Init connections
-    tic = time.perf_counter()
     logger.info("Initiate AWS connections from Remove VPC.")
     session = boto3.Session()
     client = boto3.client('ec2')
@@ -28,28 +26,43 @@ def main():
     # vpc = 'vpc-01d6840cc8e27092c'
     vpc = input("Enter VPC ID: ")
 
-    # for instance in client.describe_instances(Filters=[{'Name': 'vpc-id','Values': [vpc]}])['Reservations'][0]['Instances']:
-    #     logger.info(f"Deleting Instance '{instance['InstanceId']}'")
-    #     client.terminate_instances(InstanceIds=[instance['InstanceId']])
+    full_tic = time.perf_counter()
+    try:
+        tic = time.perf_counter()
+        instances = []
+        for instance in client.describe_instances(Filters=[{'Name': 'vpc-id','Values': [vpc]}])['Reservations']:
+            instances.append(instance['Instances'][0]['InstanceId'])
+    
+        logger.info(f"Deleting Instances '{instances}'")
+        client.terminate_instances(InstanceIds=instances)
+
+        waiter = client.get_waiter('instance_terminated')
+        logger.info(f"Waiting for instances to be terminated...")
+        waiter.wait(InstanceIds=instances)
+        toc = time.perf_counter()
+        logger.info(f"Time took to delete EC2 instances - {toc - tic:0.2f} seconds")
+    except:
+        logger.info("Skipping EC2 instances because <!insert-reason-here!>.")
 
 
-    nat_4_wait = None
+    tic = time.perf_counter()
+    nats = []
     for nat in client.describe_nat_gateways(Filters=[{'Name': 'vpc-id', 'Values': [vpc]}])['NatGateways']:
+        nats.append(nat['NatGatewayId'])
         logger.info(f"Deleting NAT Gatewaty '{nat['NatGatewayId']}'")
         client.delete_nat_gateway(NatGatewayId=nat['NatGatewayId'])
-        nat_4_wait = nat['NatGatewayId']
 
-    logger.info("Waiting for last NAT Gateway to be deleted...")
+    logger.info("Waiting for NAT Gateways to be deleted...")
     waiter = client.get_waiter('nat_gateway_deleted')
-    waiter.wait(NatGatewayIds=[nat_4_wait])
+    waiter.wait(NatGatewayIds=nats)
 
     toc = time.perf_counter()
-    print(f"NAT Deleted in {toc - tic:0.4f} seconds")
+    logger.info(f"Time took to delete NAT Gateways -> {toc - tic:0.2f} seconds")
 
+    tic = time.perf_counter()
     for eip in client.describe_addresses()['Addresses']:
         logger.info(f"Elastic IP {eip['PublicIp']} is not associated, releasing")
         client.release_address(AllocationId=eip['AllocationId'])
-
 
     for ig in client.describe_internet_gateways(Filters=[{'Name': 'attachment.vpc-id','Values': [vpc]}])['InternetGateways']:
         logger.info(f"Deleting Internet Gateway '{ig['InternetGatewayId']}'")
@@ -57,16 +70,24 @@ def main():
         client.delete_internet_gateway(InternetGatewayId=ig['InternetGatewayId'])
 
     for scgr in client.describe_security_groups(Filters=[{'Name': 'vpc-id','Values': [vpc]}])['SecurityGroups']:
+        if scgr['GroupName'] == 'default':
+            continue
         logger.info(f"Deleting Security Group '{scgr['GroupName']}'")
         client.delete_security_group(GroupId=scgr['GroupId'])
 
     for rt in client.describe_route_tables(Filters=[{'Name': 'vpc-id','Values': [vpc]}])['RouteTables']:
-        logger.info(rt)
-        logger.info(f"Deleting Route Table '{rt['RouteTableId']}'")
+        logger.info(f"Trying to delete Route Table '{rt['RouteTableId']}'")
         for rtb_assoc in rt['Associations']:
+            is_main = False
             if rtb_assoc['Main'] == False:
                 client.disassociate_route_table(AssociationId=rtb_assoc['RouteTableAssociationId'])
-        client.delete_route_table(RouteTableId=rt['RouteTableId'])
+            else:
+                is_main=True
+        if not is_main:
+            logger.info("Route table deleted.")
+            client.delete_route_table(RouteTableId=rt['RouteTableId'])
+        else:
+            logger.exception("Main Route Table can't be deleted.")
 
     for subnet in client.describe_subnets(Filters=[{'Name': 'vpc-id','Values': [vpc]}])['Subnets']:
         logger.info(f"Deleting Subnet '{subnet['SubnetId']}'")
@@ -79,8 +100,10 @@ def main():
     logger.info(f"Deleting VPC '{vpc}'")
     client.delete_vpc(VpcId=vpc)
     toc = time.perf_counter()
-    print(f"VPC Deleted in {toc - tic:0.4f} seconds")
+    logger.info(f"VPC Deleted in {toc - full_tic:0.2f} seconds")
 
-    logger.info("Cleaned up and rolled out! 😊")
+    logger.info("😊 Cleaned up and rolled out! 😊")
+
+
 if __name__ == '__main__':
     main()

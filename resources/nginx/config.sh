@@ -14,9 +14,9 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-sed "s/\${jenkins_addr}/${jenkins_addr}/" ./resources/nginx/nginx.conf
-sed "s/\${gitea_addr}/${gitea_addr}/" ./resources/nginx/nginx.conf
-sed "s/\${artifactory_addr}/${artifactory_addr}/" ./resources/nginx/nginx.conf
+sed -i "s/\${jenkins_addr}/${jenkins_addr}/" ./resources/nginx/nginx.conf
+sed -i "s/\${gitea_addr}/${gitea_addr}/" ./resources/nginx/nginx.conf
+sed -i "s/\${artifactory_addr}/${artifactory_addr}/" ./resources/nginx/nginx.conf
 
 
 mkdir -p ./resources/nginx/certs
@@ -48,4 +48,3 @@ openssl req -new -nodes -x509 -days 3650 -newkey rsa:4096 \
         -keyout ./resources/nginx/certs/dot.local.key -out ./resources/nginx/certs/dot.local.crt \
         -config ./resources/nginx/certs/dot.local.cfg -extensions v3_req
 
-docker-compose -f "$(dirname $0)/docker-compose.yaml" up -d
