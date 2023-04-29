@@ -173,11 +173,11 @@ def wait_for_port(port: int, host: str = 'localhost', timeout: float = 5.0):
         try:
             with socket.create_connection((host, port), timeout=timeout):
                 break
-        except OSError as ex:
+        except OSError as e:
             time.sleep(0.01)
             if time.perf_counter() - start_time >= timeout:
                 raise TimeoutError('Waited too long for the port {} on host {} to start accepting '
-                                   'connections.'.format(port, host)) from ex
+                                   'connections.'.format(port, host)) from e
 
 def main():
     logger.error("Please refer to main app, EC2 main function isn't callable.")

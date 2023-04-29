@@ -1,8 +1,10 @@
-FROM python:3.11.2-alpine3.17
+FROM python:3.11.2
 
-LABEL "maintainer" "Nicusor Sirb"
+LABEL "maintainer" "Nicu Sirb"
 
-RUN adduser -h /app -D -u 1000 app
+RUN apt-get update && \
+    apt-get install -y vim python3-waitress && \
+    adduser --home /app --uid 1000 --disabled-password --gecos 'app' app
 
 USER app
 WORKDIR /app
@@ -12,3 +14,6 @@ COPY --chown=app:app ./ /app/
 RUN pip install --upgrade pip && \
     pip install -r /app/requirements.txt && \
     mkdir -p /app/shadow/
+
+ENTRYPOINT [ "python3" ]
+CMD [ "main.py" ]
