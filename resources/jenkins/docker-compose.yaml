@@ -22,8 +22,8 @@ services:
     user: root
     <<: *common-config
     environment:
-      - JENKINS_OPTS=--prefix=/jenkins --httpPort=8080
-      - JAVA_OPTS=-Dhudson.model.DownloadService.noSignatureCheck=true
+      JENKINS_OPTS: --httpPort=8080 --prefix=/jenkins
+      JAVA_OPTS: -Dhudson.model.DownloadService.noSignatureCheck=true
     volumes:
       - jenkins_home:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
@@ -41,7 +41,7 @@ services:
     expose:
       - 22
     environment:
-      - JENKINS_AGENT_SSH_PUBKEY=ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDZ3F5a3nTopHul2wt1qMmQFvmAeC/RSm4977r+5Ga7xrapja9e5JgJ+LJlq/l90YgPgD98BdPcDZ88vdeMwjDGZhz0/g5jQHmDhZemsAfCbzzprJupK2e/YYnklgYPq2uokDcMvaWWnHxUXA8TyxOiVpQ1Aj8mQCqR9TVisHAesLBrwAbV5r4lpxybnFQld4NrYcTzr/HB3Ktq6avmyrfjSPMIhBTnqq84qlNaR1VyotQbHIeqRlN8suNzZ/YMEgF2DY/vrUqpwQzuA8xT1987WZOVj4JwBNGuX98sbipSVEjEFq6IgPfndQi7OcNjypmxXpDLpFTYKcKPYuXrQsjV0XyetTUXbPR6KpJspItSPZjhcGEomGR599yL1tplS0VhNvmOAQczW+6ig9Eo1Nss9qclz8VKCpuuzDOB66A7cwUidXuVbc9lYqehndzFLQMRH4p1H7oCrnpTP8jLhBVviHLwSJ6xE1ERDm107pit/BEaXVctqqovdAkqENYxUR8= kali@SNick
+      - JENKINS_AGENT_SSH_PUBKEY=-JENKINS_AGENT_SSH_PUBKEY-
     volumes:
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro

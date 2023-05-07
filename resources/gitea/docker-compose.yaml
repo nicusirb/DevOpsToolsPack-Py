@@ -17,6 +17,7 @@ services:
       - USER_GID=1000
       - GITEA__security__INSTALL_LOCK=true
       - GITEA__service__DISABLE_REGISTRATION=true
+      - GITEA__server__ROOT_URL=http://localhost:3000/gitea/
     restart: always
     networks:
       - gitea

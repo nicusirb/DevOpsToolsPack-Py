@@ -8,6 +8,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.js"
         integrity="sha512-MgkNs0gNdrnOM7k+0L+wgiRc5aLgl74sJQKbIWegVIMvVGPc1+gc1L2oK9Wf/D9pq58eqIJAxOonYPVE5UwUFA=="
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
 </head>
 
 <body>
@@ -22,7 +23,7 @@
 
     <div class="container">
         <div clas="row">
-            <div class="form">
+            <div id="main-form" class="form">
                 <div class="title">DevOps Tools Pack Installer</div>
                 <div class="subtitle">Let's create your DevOps Platform in AWS with a click!</div>
                 <div class="input-container ic1">
@@ -33,7 +34,7 @@
                 <div class="input-container ic2">
                     <input id="aws_access_key_id" class="input" type="text" placeholder=" " />
                     <div class="cut"></div>
-                    <label for="aws_access_key_id" class="placeholder">AWS Secret Key ID</label>
+                    <label for="aws_access_key_id" class="placeholder">AWS Access Key</label>
                 </div>
                 <div class="input-container ic2">
                     <input id="aws_secret_access_key" class="input" type="text" placeholder=" " />
@@ -44,6 +45,24 @@
                     <input id="region" class="input" type="text" placeholder=" " />
                     <div class="cut cut-short"></div>
                     <label for="region" class="placeholder">Region</label>
+                </div>
+
+                <div class="list-choice">
+                    <div class="list-choice-title">EC2 Instance Type</div>
+                    <div class="list-choice-objects">
+                        <label>
+                            <input type="radio" name="instance_type" value="free-ec2-instance"/><span>Free EC2 Instance</span>
+                        </label>
+                        <label>
+                            <input type="radio" name="instance_type" value="small-ec2-instance"/><span>Small EC2 Instance</span>
+                        </label>
+                        <label>
+                            <input type="radio" name="instance_type" value="medium-ec2-instance"/><span>Medium EC2 Instance</span>
+                        </label>
+                        <label>
+                            <input type="radio" name="instance_type" value="large-ec2-instance"/><span>Large EC2 Instance</span>
+                        </label>
+                    </div>
                 </div>
 
                 <div class="wrapper">
@@ -68,10 +87,12 @@
 
         <div class="modal output" id="output-container">
             <div class="modal-header">
-                <button type="text" class="submit" onclick="closeModal();">Installer Logs... Click for
-                    closure...</button>
+                Installer Logs...
             </div>
             <div id="output" style="margin-bottom: 20px;"></div>
+            <button type="text" class="submit btn-close"
+                style="border-radius: 8px; padding: 12px 28px;font-size: 16px; background-color: #008CBA;width: fit-content;margin-bottom: 16px;"
+                onclick="closeModal();">Close</button>
         </div>
 
         <!-- <script src="{{ url_for('static',filename='js/script.js') }}"></script> -->
@@ -79,24 +100,41 @@
 
             function openModal() {
                 document.getElementById("output-container").style.display = "block";
+                document.getElementById("main-form").style.display = "none";
                 document.getElementById("run").disabled = true;
             }
 
             function closeModal() {
                 document.getElementById("output-container").style.display = "none";
+                document.getElementById("main-form").style.display = "block";
                 document.getElementById("output").innerHTML = "";
                 document.getElementById("run").disabled = false;
             }
 
             var socket = io();
             function runScript() {
+                let instance_types = document.getElementsByName("instance_type")
+                let _instance_type = ""
+                for (let instance_type of instance_types) {
+                    if (instance_type.checked) {
+                        _instance_type = instance_type.value;
+                    }
+                }
+                if (_instance_type == ""){
+                    alert("Please choose EC2 instance type.")
+                    closeModal()
+                    return
+                }
+
+
                 var params = {
                     project: document.getElementById("project").value,
                     aws_access_key_id: document.getElementById("aws_access_key_id").value,
                     aws_secret_access_key: document.getElementById("aws_secret_access_key").value,
                     region: document.getElementById("region").value,
                     single_vm: document.getElementById("option-1").checked,
-                    multiple_vm: document.getElementById("option-2").checked
+                    multiple_vm: document.getElementById("option-2").checked,
+                    instance_type: _instance_type
                 };
                 socket.emit('run_script', params);
             }

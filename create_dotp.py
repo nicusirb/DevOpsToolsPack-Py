@@ -26,10 +26,11 @@ def json_datetime_serializer(obj):
         return obj.isoformat()
     raise TypeError("Type %s not serializable" % type(obj))
 
-def run(multiple_vms, project='dev-ops-tools-pack'):
+def run(multiple_vms, _instance_type, project='dev-ops-tools-pack'):
     """
     Start boto3 session, get config from ~/.aws/config , ~/.aws/credentials:
     """
+
     # Init connections
     full_tic = time.perf_counter()
     logger.info("Initiate AWS connections.")
@@ -157,7 +158,7 @@ def run(multiple_vms, project='dev-ops-tools-pack'):
     public_subnet2_id = public_subnet2['Subnet']['SubnetId']
     
     # Set EC2 properties
-    image_id, instance_type, key_pair_name_, instance_size = get_ec2_custom_template("free-ec2-instance")
+    image_id, instance_type, key_pair_name_, instance_size = get_ec2_custom_template(_instance_type)
     # print(f"Image ID: {image_id}\nInstance type: {instance_type}\nKey pair name: {key_pair_name}")
     key_pair_name = key_pair_name_ + "-" + str(time.perf_counter()).split('.')[1]
     create_ec2_key_pair(key_name=key_pair_name)
@@ -166,6 +167,7 @@ def run(multiple_vms, project='dev-ops-tools-pack'):
                                                 ip_permissions = "0.0.0.0/0:22,0.0.0.0/0:3000,0.0.0.0/0:8080,0.0.0.0/0:8081", 
                                                 subnet_id  = private_subnet1_id )
     # Create EC2 instances
+    emit("output", f"Provisioning EC2 instances...")
     tic = time.perf_counter()
     ec2_jenkins_privdns = ec2_gitea_privdns = ec2_artifactory_privdns = None
     ec2_jenkins = create_ec2_instance(session.region_name, image_id, instance_type, key_pair_name, instance_size, private_subnet1_id, private_subnet1_sgr, instance_name="dot_jenkins")
@@ -238,15 +240,18 @@ def run(multiple_vms, project='dev-ops-tools-pack'):
         logger.info("Copy resources to all EC2 instances...")
         emit("output", "Copy resources to all EC2 instances...")
 
-        stdin, stdout, stderr = ssh_client.exec_command("scp -q -r -i ./shadow/" +key_pair_name + ".pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ./resources/ ubuntu@" + ec2_jenkins_privdns + ":~")
+        stdin, stdout, stderr = ssh_client.exec_command("scp -q -r -i ./shadow/" +key_pair_name + ".pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null " + 
+                                                        "./resources/ ubuntu@" + ec2_jenkins_privdns + ":~")
         exit_status = stdout.channel.recv_exit_status()
 
         if ec2_gitea_privdns != ec2_jenkins_privdns:
-            stdin, stdout, stderr = ssh_client.exec_command("scp -q -r -i ./shadow/" +key_pair_name + ".pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ./resources/ ubuntu@" + ec2_gitea_privdns + ":~")
+            stdin, stdout, stderr = ssh_client.exec_command("scp -q -r -i ./shadow/" +key_pair_name + ".pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null " + 
+                                                            "./resources/ ubuntu@" + ec2_gitea_privdns + ":~")
             exit_status = stdout.channel.recv_exit_status()
 
         if ec2_artifactory_privdns != ec2_jenkins_privdns:    
-            stdin, stdout, stderr = ssh_client.exec_command("scp -q -r -i ./shadow/" +key_pair_name + ".pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ./resources/ ubuntu@" + ec2_artifactory_privdns + ":~")
+            stdin, stdout, stderr = ssh_client.exec_command("scp -q -r -i ./shadow/" +key_pair_name + ".pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null " + 
+                                                            "./resources/ ubuntu@" + ec2_artifactory_privdns + ":~")
             exit_status = stdout.channel.recv_exit_status()
         
         
@@ -255,14 +260,17 @@ def run(multiple_vms, project='dev-ops-tools-pack'):
         emit("output", "Installing docker...")
         stdin, stdout, stderr = ssh_client.exec_command("sudo /bin/bash ./resources/ubuntu/docker_install.sh")
         exit_status = stdout.channel.recv_exit_status()
-        stdin, stdout, stderr = ssh_client.exec_command("ssh -i ./shadow/" +key_pair_name + ".pem -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@"+ ec2_jenkins_privdns +" sudo /bin/bash ./resources/ubuntu/docker_install.sh")
+        stdin, stdout, stderr = ssh_client.exec_command("ssh -i ./shadow/" +key_pair_name + ".pem -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null " + 
+                                                        "ubuntu@"+ ec2_jenkins_privdns + " sudo /bin/bash ./resources/ubuntu/docker_install.sh")
         exit_status = stdout.channel.recv_exit_status()
 
         if ec2_gitea_privdns != ec2_jenkins_privdns:
-            stdin, stdout, stderr = ssh_client.exec_command("ssh -i ./shadow/" +key_pair_name + ".pem -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@"+ ec2_gitea_privdns +" sudo /bin/bash ./resources/ubuntu/docker_install.sh")
+            stdin, stdout, stderr = ssh_client.exec_command("ssh -i ./shadow/" +key_pair_name + ".pem -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null " + 
+                                                            "ubuntu@"+ ec2_gitea_privdns +" sudo /bin/bash ./resources/ubuntu/docker_install.sh")
             exit_status = stdout.channel.recv_exit_status()
         if ec2_artifactory_privdns != ec2_jenkins_privdns:
-            stdin, stdout, stderr = ssh_client.exec_command("ssh -i ./shadow/" +key_pair_name + ".pem -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@"+ ec2_artifactory_privdns +" sudo /bin/bash ./resources/ubuntu/docker_install.sh")
+            stdin, stdout, stderr = ssh_client.exec_command("ssh -i ./shadow/" +key_pair_name + ".pem -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null " + 
+                                                            "ubuntu@"+ ec2_artifactory_privdns +" sudo /bin/bash ./resources/ubuntu/docker_install.sh")
             exit_status = stdout.channel.recv_exit_status()
 
 
@@ -284,25 +292,30 @@ def run(multiple_vms, project='dev-ops-tools-pack'):
 
         logger.info("Installing Jenkins")
         emit("output", "Installing Jenkins")
-        stdin, stdout, stderr = ssh_client.exec_command("ssh -i ./shadow/" +key_pair_name + ".pem -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@"+ ec2_jenkins_privdns +" sudo /bin/bash ./resources/jenkins/install.sh")
+        stdin, stdout, stderr = ssh_client.exec_command("ssh -i ./shadow/" +key_pair_name + ".pem -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null " + 
+                                                        "ubuntu@"+ ec2_jenkins_privdns +" sudo /bin/bash ./resources/jenkins/install.sh")
         exit_status = stdout.channel.recv_exit_status()
         
-        stdin, stdout, stderr = ssh_client.exec_command("ssh -i ./shadow/" +key_pair_name + ".pem -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@"+ ec2_jenkins_privdns +" while true; do docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword && break || sleep 5; done")
+        stdin, stdout, stderr = ssh_client.exec_command("ssh -i ./shadow/" +key_pair_name + ".pem -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null " +
+                                                        "ubuntu@"+ ec2_jenkins_privdns +" while true; do docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword && break || sleep 5; done")
         jenkins_initial_password = stdout.read()        
 
         logger.info("Installing Gitea")
         emit("output", "Installing Gitea")
-        stdin, stdout, stderr = ssh_client.exec_command("ssh -i ./shadow/" +key_pair_name + ".pem -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@"+ ec2_gitea_privdns +" docker-compose -f ./resources/gitea/docker-compose.yaml up -d")
+        stdin, stdout, stderr = ssh_client.exec_command("ssh -i ./shadow/" +key_pair_name + ".pem -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null " + 
+                                                        "ubuntu@"+ ec2_gitea_privdns +" docker-compose -f ./resources/gitea/docker-compose.yaml up -d")
         exit_status = stdout.channel.recv_exit_status()
 
         gitea_pwd = ''.join(secrets.choice(string.ascii_uppercase + string.ascii_lowercase) for _ in range(16))
 
         # Wait for Gitea (port 3000) is up
-        stdin, stdout, stderr = ssh_client.exec_command("ssh -i ./shadow/" +key_pair_name + ".pem -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@"+ ec2_gitea_privdns +" while ! curl --output /dev/null --silent --head --fail http://"+ec2_gitea_privdns+":3000; do sleep 1; done;")
+        stdin, stdout, stderr = ssh_client.exec_command("ssh -i ./shadow/" +key_pair_name + ".pem -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null " + 
+                                                        "ubuntu@"+ ec2_gitea_privdns +" while ! curl --output /dev/null --silent --head --fail http://"+ec2_gitea_privdns+":3000; do sleep 1; done;")
         exit_status = stdout.channel.recv_exit_status()
 
         # Create default Gitea 'root' user with random password.
-        stdin, stdout, stderr = ssh_client.exec_command("ssh -i ./shadow/" +key_pair_name + ".pem -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@"+ ec2_gitea_privdns +" docker exec -u 1000 gitea gitea admin user create --admin --username root --password ORjgMlArdjkgMaOt --email admin@localhost.com")
+        stdin, stdout, stderr = ssh_client.exec_command("ssh -i ./shadow/" +key_pair_name + ".pem -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null " + 
+                                                        "ubuntu@"+ ec2_gitea_privdns +" docker exec -u 1000 gitea gitea admin user create --admin --username root --password " + gitea_pwd + " --email admin@localhost.com")
         logger.info(stdout.read().decode())
         
 

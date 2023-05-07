@@ -36,9 +36,10 @@ def handle_run_script(script_params):
     if script_params["aws_access_key_id"] == '' or script_params["aws_secret_access_key"] == '':
         emit('output', "[error] AWS Secret Key ID or AWS Secret Access Key is missing!")
         return
+    
     login(aws_access_key_id=script_params["aws_access_key_id"], 
-                         aws_secret_access_key=script_params["aws_secret_access_key"], 
-                         region=script_params["region"])
+          aws_secret_access_key=script_params["aws_secret_access_key"], 
+          region=script_params["region"])
     
     # test_run(project=script_params["project"], 
     #                             aws_access_key_id=script_params["aws_access_key_id"], 
@@ -46,7 +47,7 @@ def handle_run_script(script_params):
     ##                             region=script_params["region"],
     #                             multiple_vms = script_params["multiple_vm"])
     
-    run(multiple_vms = script_params["multiple_vm"], project=script_params["project"])
+    run(multiple_vms = script_params["multiple_vm"], project=script_params["project"], _instance_type=script_params["instance_type"])
 
 
 
