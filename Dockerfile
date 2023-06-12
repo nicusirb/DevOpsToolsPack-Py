@@ -15,5 +15,6 @@ RUN pip install --upgrade pip && \
     pip install -r /app/requirements.txt && \
     mkdir -p /app/shadow/
 
+EXPOSE 5555
 ENTRYPOINT [ "python3" ]
 CMD [ "main.py" ]
