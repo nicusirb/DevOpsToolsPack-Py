@@ -51,16 +51,20 @@
                     <div class="list-choice-title">EC2 Instance Type</div>
                     <div class="list-choice-objects">
                         <label>
-                            <input type="radio" name="instance_type" value="free-ec2-instance"/><span>Free EC2 Instance</span>
+                            <input type="radio" name="instance_type" value="free-ec2-instance" /><span>Free EC2
+                                Instance</span>
                         </label>
                         <label>
-                            <input type="radio" name="instance_type" value="small-ec2-instance"/><span>Small EC2 Instance</span>
+                            <input type="radio" name="instance_type" value="small-ec2-instance" /><span>Small EC2
+                                Instance</span>
                         </label>
                         <label>
-                            <input type="radio" name="instance_type" value="medium-ec2-instance"/><span>Medium EC2 Instance</span>
+                            <input type="radio" name="instance_type" value="medium-ec2-instance" /><span>Medium EC2
+                                Instance</span>
                         </label>
                         <label>
-                            <input type="radio" name="instance_type" value="large-ec2-instance"/><span>Large EC2 Instance</span>
+                            <input type="radio" name="instance_type" value="large-ec2-instance" /><span>Large EC2
+                                Instance</span>
                         </label>
                     </div>
                 </div>
@@ -120,7 +124,7 @@
                         _instance_type = instance_type.value;
                     }
                 }
-                if (_instance_type == ""){
+                if (_instance_type == "") {
                     alert("Please choose EC2 instance type.")
                     closeModal()
                     return
